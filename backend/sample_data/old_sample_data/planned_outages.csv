@@ -1,0 +1,2 @@
+outage_id,outage_type,status,start_time,estimated_end_time,actual_end_time,etr_predicted_by_ml,cancellation_flag,created_at
+OTGCSV001,Planned,Scheduled,2026-05-15 10:00:00,2026-05-15 14:00:00,,False,False,2026-05-09 10:00:00

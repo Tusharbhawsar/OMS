@@ -1,0 +1,223 @@
+{
+  "info": {
+    "name": "Outage Communication System - Phase 1 POC",
+    "description": "Postman collection for the FastAPI Phase 1 POC backend. Covers health, data upload, dashboard, affected customers, planned outage processing, batch processing, and notification tracking.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlRoot}}/health",
+              "host": ["{{baseUrlRoot}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Readiness Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["ready"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Uploads",
+      "item": [
+        {
+          "name": "Upload Outage Excel or CSV",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/uploads/outage-data",
+              "host": ["{{baseUrl}}"],
+              "path": ["uploads", "outage-data"]
+            },
+            "description": "Select data_outage_system.xlsx or planned_outages.csv as the form-data file value."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Outage Dashboard Rows",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/active-outages",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "active-outages"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Outages",
+      "item": [
+        {
+          "name": "List Active Outages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/outages/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["outages", "active"]
+            }
+          }
+        },
+        {
+          "name": "Identify Affected Customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/outages/{{outageId}}/affected-customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["outages", "{{outageId}}", "affected-customers"]
+            },
+            "description": "Returns affected customers in priority order and persists outage_customer_map records."
+          }
+        },
+        {
+          "name": "Process Single Planned Outage",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/outages/{{outageId}}/process-planned?notification_type={{notificationType}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["outages", "{{outageId}}", "process-planned"],
+              "query": [
+                {
+                  "key": "notification_type",
+                  "value": "{{notificationType}}"
+                }
+              ]
+            },
+            "description": "Runs the LangGraph POC workflow for a Planned/PSPS outage. Allowed notification types: Advance Notice, Reminder, Outage Start, Outage Restored, Cancellation Alert."
+          }
+        },
+        {
+          "name": "Process Planned Outage Batch",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/outages/batch/process-planned",
+              "host": ["{{baseUrl}}"],
+              "path": ["outages", "batch", "process-planned"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications?limit=200",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "200"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Notifications By Outage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications?outage_id={{outageId}}&limit=200",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [
+                {
+                  "key": "outage_id",
+                  "value": "{{outageId}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "200"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrlRoot",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "outageId",
+      "value": "OTG00001",
+      "type": "string"
+    },
+    {
+      "key": "notificationType",
+      "value": "Advance Notice",
+      "type": "string"
+    }
+  ]
+}
