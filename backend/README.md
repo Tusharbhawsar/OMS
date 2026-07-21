@@ -3,14 +3,12 @@
 Production-style FastAPI backend skeleton for the Phase 1:
 
 - Upload Excel/CSV data
-- PostgreSQL schema with Alembic migrations
+- SQLite schema with Alembic migrations
 - Planned outage batch processing
 - Basic customer-to-service-point-to-outage mapping
 - SMS/Email sandbox notifications
-- Smart, personalised, **multilingual** message generation via Google Gemini (Vertex AI),
-  with a deterministic template fallback
 - Streamlit monitoring dashboard
-- Basic LangGraph agent orchestration (step orchestration only — not autonomous/agentic)
+- Basic LangGraph agent orchestration
 - Structured JSON logging and standard API response envelope
 
 ## Architecture
@@ -28,10 +26,10 @@ FastAPI API Layer
         |       FileIngestionService
         |       PlannedOutageService
         |       CustomerMappingService
-        |       NotificationService --> LlmMessageService --> Gemini (Vertex AI)
-        |       DashboardService                  (template fallback on failure)
+        |       NotificationService
+        |       DashboardService
         |
-        +--> PostgreSQL
+        +--> SQLite
         |
 ```
 
@@ -113,9 +111,8 @@ npm run dev
 
 - Notification delivery is sandboxed by default. It writes delivery attempts to DB and logs them; it does not call real Twilio/SendGrid unless you extend the notifier adapters.
 - IVR and App Push customer preferences are recorded, but POC dispatch simulates delivery. Phase 1 focuses on SMS and Email.
-- LangGraph is used for basic orchestration, but business-critical decisions remain deterministic and auditable. Gemini only generates the message *text* (no routing/timing decisions); it is not an autonomous agent.
-- Message generation uses Gemini on Vertex AI (auth via the service-account `auth.json`). Supports English and Spanish via the `CUSTOMER.preferred_language` column. Set `LLM_ENABLED=false` to disable and use deterministic English templates only; the same fallback triggers on any LLM error or guardrail rejection.
-- This POC imports data from Excel sheets matching the uploaded workbook names: `CUSTOMER`, `SERVICE_POINT`, `OUTAGE_EVENT`, `CUSTOMER_SERVICE_POINT`, `CUSTOMER_TYPE`, `CHANNEL_MASTER`, `OUTAGE_CIRCUIT_MAP`, and `OUTAGE_CUSTOMER_MAP`. The `CUSTOMER` sheet now carries a `preferred_language` column.
+- LangGraph is used for basic orchestration, but business-critical decisions remain deterministic and auditable.
+- This POC imports data from Excel sheets matching the uploaded workbook names: `CUSTOMER`, `SERVICE_POINT`, `OUTAGE_EVENT`, `CUSTOMER_SERVICE_POINT`, `CUSTOMER_TYPE`, `CHANNEL_MASTER`, `OUTAGE_CIRCUIT_MAP`, and `OUTAGE_CUSTOMER_MAP`.
 
 ## Project Structure
 
@@ -124,8 +121,7 @@ app/
   api/v1/endpoints/       FastAPI route handlers
   agents/                 LangGraph orchestration graph
   core/                   config, db, logging, telemetry, errors
-  integrations/notifiers/ notification adapters (SMS/Email)
-  integrations/llm/       Gemini (Vertex AI) client for message generation
+  integrations/notifiers/ notification adapters
   models/                 SQLAlchemy models
   repositories/           DB access layer
   schemas/                Pydantic request/response models

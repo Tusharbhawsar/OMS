@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.common import OrmModel
 
@@ -14,8 +14,19 @@ class OutageEventOut(OrmModel):
     actual_end_time: datetime | None
     etr_predicted_by_ml: bool
     cancellation_flag: bool
-    cancelled_at: datetime | None
     created_at: datetime
+
+
+class ActualEndTimeIn(BaseModel):
+    """Field person input: the real time at which power was restored on site."""
+
+    actual_end_time: datetime = Field(..., description="Actual restoration time reported from the field (IST).")
+
+
+class CancellationIn(BaseModel):
+    """Operator input: raise (or clear) the cancellation flag for a planned outage."""
+
+    cancellation_flag: bool = Field(default=True, description="True to cancel the outage, False to revoke a cancellation.")
 
 
 class AffectedCustomerOut(BaseModel):

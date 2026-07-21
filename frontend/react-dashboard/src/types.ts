@@ -40,7 +40,6 @@ export interface OutageEvent {
   start_time: string | null;
   estimated_end_time: string | null;
   actual_end_time: string | null;
-  cancelled_at: string | null;
   etr_predicted_by_ml: boolean;
   cancellation_flag: boolean;
   created_at: string;

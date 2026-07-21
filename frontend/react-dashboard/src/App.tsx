@@ -5,11 +5,10 @@ import { formatIstDateTime } from "./utils/date";
 import { ActiveOutagesTable } from "./components/ActiveOutagesTable";
 import { AffectedCustomersPanel } from "./components/AffectedCustomersPanel";
 import { BrandHeader } from "./components/BrandHeader";
-// import { DataIngestionStatusCard } from "./components/DataIngestionStatusCard";
+import { DataIngestionStatusCard } from "./components/DataIngestionStatusCard";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { KpiCard } from "./components/KpiCard";
 import { NotificationsPanel } from "./components/NotificationsPanel";
-import { OutageLifecycleCard } from "./components/OutageLifecycleCard";
 import type {
   ActiveOutageRow,
   AffectedCustomer,
@@ -17,7 +16,6 @@ import type {
   IngestionStatus,
   NotificationRecord,
   NotificationType,
-  OutageEvent,
   ProcessingResult,
 } from "./types";
 
@@ -78,8 +76,6 @@ export default function App() {
   const [isCustomerLoading, setIsCustomerLoading] = useState(false);
   const [isNotificationLoading, setIsNotificationLoading] = useState(false);
   const [isDownloadingRebasedFile, setIsDownloadingRebasedFile] = useState(false);
-  const [isLifecycleUpdating, setIsLifecycleUpdating] = useState(false);
-  const [lastLifecycleOutage, setLastLifecycleOutage] = useState<OutageEvent | null>(null);
 
   // `silent` background refreshes (used by the auto-poll timer) update the data in
   // place without toggling the loading spinners or flashing the error banner, so the
@@ -215,24 +211,6 @@ export default function App() {
       setError(getErrorMessage(err));
     } finally {
       setIsDownloadingRebasedFile(false);
-    }
-  }
-
-  async function handleLifecycleUpdate(outageId: string, action: "cancel" | "restore") {
-    setIsLifecycleUpdating(true);
-    setError(null);
-    try {
-      const outage = action === "cancel"
-        ? await outageApi.cancelOutage(outageId)
-        : await outageApi.restoreOutage(outageId);
-      setLastLifecycleOutage(outage);
-      setNotificationFilter(outageId);
-      await refreshDashboard();
-      setNotifications(await outageApi.listNotifications(outageId));
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setIsLifecycleUpdating(false);
     }
   }
 
@@ -386,19 +364,11 @@ export default function App() {
           </div> */}
         </div>
       </section>
-      {/* <DataIngestionStatusCard
+      <DataIngestionStatusCard
         summary={summary}
         ingestionStatus={ingestionStatus}
         isRefreshing={isLoading}
         onRefresh={refreshDashboard}
-      /> */}
-
-      <OutageLifecycleCard
-        activeOutages={activeRows}
-        isSubmitting={isLifecycleUpdating}
-        lastUpdatedOutage={lastLifecycleOutage}
-        onCancel={(outageId) => handleLifecycleUpdate(outageId, "cancel")}
-        onRestore={(outageId) => handleLifecycleUpdate(outageId, "restore")}
       />
 
       <ActiveOutagesTable

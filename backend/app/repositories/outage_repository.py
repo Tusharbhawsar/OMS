@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,16 @@ class OutageRepository(BaseRepository[OutageEvent]):
     # Result ko start_time ke ascending order me sort karta hai, yani jo outage pehle start hoga wo pehle aayega.
     def list_active(self) -> list[OutageEvent]:
         stmt = select(OutageEvent).where(OutageEvent.status.in_(["Active", "Scheduled"])).order_by(OutageEvent.start_time.asc())
+        return list(self.db.scalars(stmt).all())
+
+    # Ye function ek time range me aane wale saare outages fetch karta hai (status filter ke bina).
+    # Ek outage range me tab maana jaata hai jab uska start_time diye gaye start aur end ke beech aata hai.
+    # Optional taur par end bound diya ja sakta hai; agar end None hai to sirf start se aage ke outages aate hain.
+    def list_in_time_range(self, range_start: datetime, range_end: datetime | None = None) -> list[OutageEvent]:
+        stmt = select(OutageEvent).where(OutageEvent.start_time >= range_start)
+        if range_end is not None:
+            stmt = stmt.where(OutageEvent.start_time <= range_end)
+        stmt = stmt.order_by(OutageEvent.start_time.asc())
         return list(self.db.scalars(stmt).all())
 
     # Ye function Planned type ke outages me se due/current outages nikalta hai.

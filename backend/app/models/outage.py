@@ -21,9 +21,6 @@ class OutageEvent(Base):
     actual_end_time: Mapped[datetime | None] = mapped_column(DateTime)
     etr_predicted_by_ml: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     cancellation_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # Set when a cancellation event arrives (Option 3). Null until then; gives cancellation
-    # its own timestamp, parallel to actual_end_time for restoration.
-    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=ist_now, server_default=func.now(), nullable=False)
 
     circuits = relationship("OutageCircuitMap", back_populates="outage", cascade="all, delete-orphan")

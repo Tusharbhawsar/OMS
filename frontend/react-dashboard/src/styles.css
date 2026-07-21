@@ -476,53 +476,6 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 
 .ingestion-panel { margin-top: 24px; }
 
-.outage-lifecycle-panel { margin-top: 24px; }
-
-.outage-lifecycle-controls {
-  display: flex;
-  align-items: end;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--cog-border);
-  border-radius: 12px;
-  background: var(--cog-surface-2);
-}
-
-.outage-id-label {
-  display: grid;
-  flex: 1 1 280px;
-  gap: 6px;
-  color: var(--cog-text-3);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.outage-id-label input { width: 100%; }
-
-.lifecycle-cancel-button { color: #b42318; }
-.lifecycle-cancel-button:hover { color: #b42318; border-color: #fda29b; background: #fff1f0; }
-
-.lifecycle-help {
-  margin: 12px 0 0;
-  color: var(--cog-text-2);
-  font-size: 13px;
-}
-
-.lifecycle-result {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 12px 14px;
-  border: 1px solid rgba(45, 184, 31, 0.25);
-  border-radius: 10px;
-  background: var(--cog-success-bg);
-  color: #166534;
-  font-size: 13px;
-}
-
 .ingestion-overview {
   display: grid;
   grid-template-columns: minmax(260px, 1.2fr) minmax(320px, 2fr);
@@ -963,13 +916,6 @@ tbody tr:last-child td { border-bottom: 0; }
 
   .ingestion-overview,
   .ingestion-pipeline { grid-template-columns: 1fr; }
-
-  .outage-lifecycle-controls {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .outage-lifecycle-controls button { width: 100%; }
 
   .ingestion-metrics { grid-template-columns: 1fr; }
 

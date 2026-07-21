@@ -15,7 +15,6 @@ from app.models.customer import Customer, CustomerServicePoint, ServicePoint
 from app.models.notification import Notification, NotificationAttempt
 from app.models.outage import OutageCircuitMap, OutageCustomerMap, OutageEvent, RawOutageEvent
 from app.models.reference import ChannelMaster, CustomerType
-from app.services.outage_lifecycle_rules import normalize_imported_outage
 from app.utils.time import ist_now
 
 logger = logging.getLogger(__name__)
@@ -267,12 +266,6 @@ class FileIngestionService:
         keys = self.PRIMARY_KEYS[sheet_name]
         records = self._clean_records(df, model, required_columns=keys, sheet_name=sheet_name)
 
-        # Option 2 guard: outages that are still Scheduled/Active must not carry
-        # "future knowledge" (a set actual_end_time or a pre-set cancellation_flag).
-        # Those only become real via a restoration / cancellation event later.
-        if sheet_name == "OUTAGE_EVENT":
-            records = [normalize_imported_outage(record) for record in records]
-
         if not records:
             logger.warning("Skipping empty sheet", extra={"ctx_sheet_name": sheet_name})
             return 0
@@ -321,8 +314,7 @@ class FileIngestionService:
         Testers otherwise have to hand-edit start/estimated/actual end times in the
         source file before every run so notifications fall due. With rebasing on, the
         uploaded times are ignored and replaced relative to the moment of import:
-        start = now+3m, estimated_end = now+5m (offsets configurable). actual_end_time is
-        intentionally not rebased — it arrives later via a restoration event, not the file.
+        start = now+3m, estimated_end = now+5m, actual_end = now+8m (offsets configurable).
         Each time column is rebased independently and only where the source cell
         already holds a value: a blank cell stays blank (e.g. an outage with no
         actual_end_time is left "not yet restored"). Columns missing from the file are
@@ -330,13 +322,10 @@ class FileIngestionService:
         DataFrame so the caller can both upsert and export the rebased values.
         """
         base = ist_now()
-        # Only the *planned* times are rebased. actual_end_time is deliberately NOT
-        # pre-filled here: in the real world an outage's actual end is only known once a
-        # restoration event arrives (see Option 2 in docs/real_world_lifecycle_plan.md).
-        # It is delivered later via the restore event / feed simulator, not the importer.
         offsets = {
             "start_time": base + timedelta(minutes=self.settings.rebase_start_offset_min),
             "estimated_end_time": base + timedelta(minutes=self.settings.rebase_estimated_end_offset_min),
+            "actual_end_time": base + timedelta(minutes=self.settings.rebase_actual_end_offset_min),
         }
 
         df = df.copy()

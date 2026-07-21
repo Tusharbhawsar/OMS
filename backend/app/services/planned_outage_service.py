@@ -69,6 +69,70 @@ class PlannedOutageService:
             )
             outage.status = new_status
 
+    def record_actual_end_time(self, outage_id: str, actual_end_time: datetime) -> OutageEvent:
+        """Field-person input: record the real on-site restoration time for an outage.
+
+        Storing the actual end time makes the outage due for an "Outage Restored"
+        notification on the next lifecycle batch run (see _next_due_notification_type).
+        """
+        outage = self._get_planned_outage_or_raise(outage_id)
+
+        normalized_end = ensure_ist(actual_end_time)
+        start_time = ensure_ist(outage.start_time)
+        if start_time is not None and normalized_end is not None and normalized_end < start_time:
+            raise AppException(
+                "Actual end time cannot be before the outage start time",
+                400,
+                "INVALID_ACTUAL_END_TIME",
+                {"outage_id": outage_id, "start_time": start_time.isoformat()},
+            )
+
+        outage.actual_end_time = normalized_end
+        logger.info(
+            "Actual end time recorded from field",
+            extra={"ctx_outage_id": outage_id, "ctx_actual_end_time": normalized_end},
+        )
+        self.db.commit()
+        self.db.refresh(outage)
+        return outage
+
+    def set_cancellation_flag(self, outage_id: str, cancel: bool) -> OutageEvent:
+        """Operator input: mark a planned outage for cancellation (or revoke it).
+
+        Raising the flag makes the outage due for a "Cancellation Alert" on the
+        next lifecycle batch run (see _next_due_notification_type).
+        """
+        outage = self._get_planned_outage_or_raise(outage_id)
+        outage.cancellation_flag = cancel
+        logger.info(
+            "Cancellation flag updated",
+            extra={"ctx_outage_id": outage_id, "ctx_cancellation_flag": cancel},
+        )
+        self.db.commit()
+        self.db.refresh(outage)
+        return outage
+
+    def list_outages_in_range(self, range_start: datetime, range_end: datetime | None = None) -> list[OutageEvent]:
+        """Return all outages whose start_time falls within the given time range."""
+        normalized_start = ensure_ist(range_start)
+        normalized_end = ensure_ist(range_end)
+        if normalized_start is not None and normalized_end is not None and normalized_end < normalized_start:
+            raise AppException(
+                "Range end must be on or after range start",
+                400,
+                "INVALID_TIME_RANGE",
+                {"range_start": normalized_start.isoformat(), "range_end": normalized_end.isoformat()},
+            )
+        return self.outage_repo.list_in_time_range(normalized_start, normalized_end)
+
+    def _get_planned_outage_or_raise(self, outage_id: str) -> OutageEvent:
+        outage = self.outage_repo.get_by_id(outage_id)
+        if outage is None:
+            raise AppException("Outage not found", 404, "OUTAGE_NOT_FOUND", {"outage_id": outage_id})
+        if outage.outage_type not in {"Planned"}:
+            raise AppException("Only Planned outages are supported in Phase 1", 400, "UNSUPPORTED_OUTAGE_TYPE")
+        return outage
+
     def process_due_outages(self) -> list[dict[str, object]]:
         """Batch job entrypoint: process due planned outages across the notification lifecycle."""
         results: list[dict[str, object]] = []

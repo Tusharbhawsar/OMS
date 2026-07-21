@@ -41,14 +41,6 @@ export const outageApi = {
     return postJson<ProcessingResult[]>("/outages/batch/process-planned");
   },
 
-  cancelOutage(outageId: string): Promise<OutageEvent> {
-    return postJson<OutageEvent>(`/outages/${encodeURIComponent(outageId)}/cancel`);
-  },
-
-  restoreOutage(outageId: string): Promise<OutageEvent> {
-    return postJson<OutageEvent>(`/outages/${encodeURIComponent(outageId)}/restore`);
-  },
-
   listNotifications(outageId?: string): Promise<NotificationRecord[]> {
     const params = new URLSearchParams({ limit: "200" });
     if (outageId) {

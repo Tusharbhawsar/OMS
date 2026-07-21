@@ -2,6 +2,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import AppException
 from app.integrations.notifiers.base import NotificationPayload
 from app.integrations.notifiers.factory import NotifierFactory
@@ -105,7 +106,34 @@ class NotificationService:
 
 
 def get_destination_for_channel(channel_name: str, customer: dict[str, object]) -> str:
-    """Resolve the delivery address for a given channel."""
+    """Resolve the delivery address for a given channel.
+
+    Email -> the customer email (unchanged). Every other channel (SMS/WhatsApp/IVR)
+    is a phone channel, so the number is normalized to E.164 which Twilio requires.
+    """
     if channel_name.strip().lower() == "email":
         return str(customer.get("email") or "missing-email@example.local")
-    return str(customer.get("phone") or "+15550000000")
+    return normalize_phone(str(customer.get("phone") or "+15550000000"))
+
+
+def normalize_phone(raw: str) -> str:
+    """Normalize a phone number to E.164 
+
+    Rules (POC-simple):
+      * already '+<digits>'  -> kept as-is (just stripped of separators)
+      * '00' international prefix -> replaced with '+'
+      * exactly 10 digits    -> treated as a national number, gets DEFAULT_COUNTRY_CODE
+      * anything else        -> a leading '+' is added to the digits
+    """
+    import re
+
+    raw = str(raw).strip()
+    if raw.startswith("+"):
+        return "+" + re.sub(r"\D", "", raw[1:])
+
+    digits = re.sub(r"\D", "", raw)
+    if digits.startswith("00"):
+        return "+" + digits[2:]
+    if len(digits) == 10:
+        return get_settings().default_country_code + digits
+    return "+" + digits

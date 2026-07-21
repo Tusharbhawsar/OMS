@@ -1,21 +1,14 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.exceptions import AppException
 from app.core.response import success_response
 from app.repositories.outage_repository import OutageRepository
-from app.schemas.outage import OutageEventOut
+from app.schemas.outage import ActualEndTimeIn, CancellationIn, OutageEventOut
 from app.services.customer_mapping_service import CustomerMappingService
-from app.services.outage_lifecycle_rules import (
-    RESTORED_STATUSES,
-    apply_cancellation,
-    apply_restoration,
-    is_live_status,
-    normalize_status,
-)
 from app.services.planned_outage_service import PlannedOutageService
-from app.utils.time import ist_now
 
 router = APIRouter()
 
@@ -36,6 +29,40 @@ def get_affected_customers(outage_id: str, db: Session = Depends(get_db)) -> dic
     return success_response(200, "Affected customers identified successfully", customers)
 
 
+def list_outages_in_range(
+    start: datetime = Query(..., description="Range start (inclusive), IST e.g. 2026-06-30T00:00:00"),
+    end: datetime | None = Query(default=None, description="Range end (inclusive), IST. Omit for open-ended."),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """List all outages whose start time falls within the given time range."""
+    outages = PlannedOutageService(db).list_outages_in_range(start, end)
+    data = [OutageEventOut.model_validate(outage).model_dump(mode="json") for outage in outages]
+    return success_response(200, "Outages in time range fetched successfully", data)
+
+
+def record_actual_end_time(
+    outage_id: str,
+    payload: ActualEndTimeIn,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Field person reports the actual on-site restoration time for an outage."""
+    outage = PlannedOutageService(db).record_actual_end_time(outage_id, payload.actual_end_time)
+    data = OutageEventOut.model_validate(outage).model_dump(mode="json")
+    return success_response(200, "Actual end time recorded successfully", data)
+
+
+def set_cancellation_flag(
+    outage_id: str,
+    payload: CancellationIn,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Raise or revoke the cancellation flag for a planned outage."""
+    outage = PlannedOutageService(db).set_cancellation_flag(outage_id, payload.cancellation_flag)
+    data = OutageEventOut.model_validate(outage).model_dump(mode="json")
+    message = "Outage marked for cancellation" if payload.cancellation_flag else "Cancellation flag cleared"
+    return success_response(200, message, data)
+
+
 def process_planned_outage(
     outage_id: str,
     notification_type: str = Query(default="Advance Notice"),
@@ -52,76 +79,10 @@ def process_planned_batch(db: Session = Depends(get_db)) -> dict[str, object]:
     return success_response(status.HTTP_202_ACCEPTED, "Planned outage batch completed", results)
 
 
-def cancel_outage(outage_id: str, db: Session = Depends(get_db)) -> dict[str, object]:
-    """Cancel a planned outage as an event (Option 3).
-
-    Real cancellations arrive *after* an outage is scheduled, so this endpoint is how the
-    system learns about them: it flips cancellation_flag/status and stamps cancelled_at.
-    The existing lifecycle rule then fires the "Cancellation Alert" reactively. Only a
-    still-live outage (Scheduled/Active) can be cancelled; a finished one cannot. Repeating
-    the call on an already-cancelled outage is idempotent.
-    """
-    repo = OutageRepository(db)
-    outage = repo.get_by_id(outage_id)
-    if outage is None:
-        raise AppException("Outage not found", 404, "OUTAGE_NOT_FOUND", {"outage_id": outage_id})
-
-    if outage.cancellation_flag or normalize_status(outage.status) == "cancelled":
-        data = OutageEventOut.model_validate(outage).model_dump(mode="json")
-        return success_response(200, "Outage already cancelled", data)
-
-    if not is_live_status(outage.status):
-        raise AppException(
-            "Only a scheduled or active outage can be cancelled",
-            409,
-            "OUTAGE_NOT_CANCELLABLE",
-            {"outage_id": outage_id, "status": outage.status},
-        )
-
-    apply_cancellation(outage, ist_now())
-    db.commit()
-    db.refresh(outage)
-    data = OutageEventOut.model_validate(outage).model_dump(mode="json")
-    return success_response(200, "Outage cancelled successfully", data)
-
-
-def restore_outage(outage_id: str, db: Session = Depends(get_db)) -> dict[str, object]:
-    """Restore a planned outage as an event (Option 3, restoration counterpart).
-
-    Power being restored is a real-world event that arrives *after* the outage is under way,
-    so this endpoint is how the system learns the actual end: it stamps actual_end_time and
-    moves the status to Restored. The lifecycle then fires the "Outage Restored" alert
-    reactively. This is the legitimate way to fill actual_end_time, which the importer
-    refuses to set on a still-live outage. Only a live outage (Scheduled/Active) can be
-    restored; a cancelled/finished one cannot. Repeating the call is idempotent.
-    """
-    repo = OutageRepository(db)
-    outage = repo.get_by_id(outage_id)
-    if outage is None:
-        raise AppException("Outage not found", 404, "OUTAGE_NOT_FOUND", {"outage_id": outage_id})
-
-    if outage.actual_end_time is not None or normalize_status(outage.status) in RESTORED_STATUSES:
-        data = OutageEventOut.model_validate(outage).model_dump(mode="json")
-        return success_response(200, "Outage already restored", data)
-
-    if not is_live_status(outage.status):
-        raise AppException(
-            "Only a scheduled or active outage can be restored",
-            409,
-            "OUTAGE_NOT_RESTORABLE",
-            {"outage_id": outage_id, "status": outage.status},
-        )
-
-    apply_restoration(outage, ist_now())
-    db.commit()
-    db.refresh(outage)
-    data = OutageEventOut.model_validate(outage).model_dump(mode="json")
-    return success_response(200, "Outage restored successfully", data)
-
-
 router.add_api_route("/active", list_active_outages, methods=["GET"],include_in_schema=True)  # Hide from OpenAPI docs
+router.add_api_route("/range", list_outages_in_range, methods=["GET"], include_in_schema=True)
 router.add_api_route("/batch/process-planned", process_planned_batch, methods=["POST"], status_code=status.HTTP_202_ACCEPTED,include_in_schema=True)
 router.add_api_route("/{outage_id}/affected-customers", get_affected_customers, methods=["GET"],include_in_schema=True)
+router.add_api_route("/{outage_id}/actual-end-time", record_actual_end_time, methods=["PATCH"], include_in_schema=True)
+router.add_api_route("/{outage_id}/cancellation-flag", set_cancellation_flag, methods=["PATCH"], include_in_schema=True)
 router.add_api_route("/{outage_id}/process-planned", process_planned_outage, methods=["POST"], status_code=status.HTTP_202_ACCEPTED,include_in_schema=True)
-router.add_api_route("/{outage_id}/cancel", cancel_outage, methods=["POST"], include_in_schema=True)  # Option 3: cancellation as an event
-router.add_api_route("/{outage_id}/restore", restore_outage, methods=["POST"], include_in_schema=True)  # Option 3: restoration as an event
